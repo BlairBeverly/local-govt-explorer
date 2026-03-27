@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Local Government Explorer</title>
+    <meta
+      name="description"
+      content="Explore Champaign local government projects by category, status, timeline, and community impact."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Prototype</p>
+          <h1>Track what Champaign is doing without sitting through every meeting.</h1>
+          <p class="hero-text">
+            Browse live project briefings built from council activity, grouped by topic and
+            compressed into timelines, funding, votes, and open questions.
+          </p>
+        </div>
+        <div class="hero-stats" id="hero-stats" aria-label="Project summary"></div>
+      </header>
+
+      <main class="app" aria-live="polite">
+        <aside class="sidebar" aria-label="Project navigation">
+          <div class="sidebar-header">
+            <div class="sidebar-title" id="governing-body">Loading council data...</div>
+            <div class="sidebar-sub" id="sidebar-subtitle">Preparing project explorer</div>
+          </div>
+
+          <div class="search-bar">
+            <label class="sr-only" for="project-search">Search projects</label>
+            <input
+              id="project-search"
+              type="search"
+              placeholder="Search projects, topics, questions..."
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="sidebar-scroll" id="sidebar-scroll"></div>
+        </aside>
+
+        <section class="detail" id="detail-panel">
+          <div class="main-empty" id="empty-state">
+            <div class="empty-illustration" aria-hidden="true">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <rect x="5" y="7" width="38" height="34" rx="6" stroke="currentColor" stroke-width="1.5" />
+                <line x1="13" y1="17" x2="35" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="13" y1="24" x2="30" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="13" y1="31" x2="24" y2="31" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            <div class="main-empty-title">Select a project</div>
+            <div class="main-empty-sub">
+              Choose any project from the left to open a structured briefing with funding,
+              discussion, timeline, and unresolved questions.
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
