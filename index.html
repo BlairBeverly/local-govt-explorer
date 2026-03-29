@@ -42,9 +42,31 @@
             <input
               id="project-search"
               type="search"
-              placeholder="Search projects, topics, questions..."
+              placeholder="Search projects, topics, speakers, questions..."
               autocomplete="off"
             />
+          </div>
+
+          <div class="sidebar-controls" aria-label="Tracking filters">
+            <div class="control-grid">
+              <label class="control-field">
+                <span class="control-label">Category</span>
+                <select id="category-filter"></select>
+              </label>
+              <label class="control-field">
+                <span class="control-label">Status</span>
+                <select id="status-filter"></select>
+              </label>
+              <label class="control-field">
+                <span class="control-label">Project type</span>
+                <select id="tracking-filter"></select>
+              </label>
+              <label class="control-field">
+                <span class="control-label">Sort</span>
+                <select id="sort-filter"></select>
+              </label>
+            </div>
+            <div class="quick-filters" id="quick-filters"></div>
           </div>
 
           <div class="sidebar-scroll" id="sidebar-scroll"></div>
@@ -62,8 +84,8 @@
             </div>
             <div class="main-empty-title">Select a project</div>
             <div class="main-empty-sub">
-              Choose any project from the left to open a structured briefing with funding,
-              discussion, timeline, and unresolved questions.
+              Choose any project from the left to open a tracking brief with the latest
+              status, why it matters, funding, discussion, and meeting history.
             </div>
           </div>
         </section>

@@ -22,14 +22,30 @@ const ACRONYMS = new Map([
   ["e", "E"],
 ]);
 
+const SORT_OPTIONS = [
+  { value: "recent", label: "Recent activity" },
+  { value: "discussion", label: "Most discussed" },
+  { value: "public_input", label: "Most public input" },
+  { value: "funding", label: "Largest funding" },
+];
+
 const state = {
   allProjects: [],
-  filteredCategories: [],
-  openCategories: new Set(),
+  visibleProjects: [],
   selectedProjectId: null,
   searchTerm: "",
   governingBody: "",
   latestYear: "",
+  filters: {
+    category: "all",
+    status: "all",
+    trackingClass: "all",
+    hasPublicInput: false,
+    hasOpenQuestions: false,
+    fundingAttached: false,
+    hasSplitVote: false,
+  },
+  sortBy: "recent",
 };
 
 const sidebarScroll = document.getElementById("sidebar-scroll");
@@ -38,6 +54,11 @@ const searchInput = document.getElementById("project-search");
 const governingBodyEl = document.getElementById("governing-body");
 const sidebarSubtitleEl = document.getElementById("sidebar-subtitle");
 const heroStatsEl = document.getElementById("hero-stats");
+const categoryFilterEl = document.getElementById("category-filter");
+const statusFilterEl = document.getElementById("status-filter");
+const trackingFilterEl = document.getElementById("tracking-filter");
+const sortFilterEl = document.getElementById("sort-filter");
+const quickFiltersEl = document.getElementById("quick-filters");
 
 function showLoadingState() {
   detailPanel.innerHTML = `
@@ -92,17 +113,21 @@ function formatDate(dateString) {
 
 function formatDuration(totalSeconds) {
   if (!totalSeconds) {
-    return "No recorded discussion time";
+    return "0 min";
   }
 
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  if (minutes === 0) {
-    return `${seconds} sec of discussion`;
+  const minutes = Math.round(totalSeconds / 60);
+  if (minutes < 1) {
+    return "<1 min";
   }
 
-  return `${minutes} min ${seconds} sec of discussion`;
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 function titleCaseWord(word) {
@@ -114,15 +139,7 @@ function titleCaseWord(word) {
     return ACRONYMS.get(word);
   }
 
-  if (/^\d+$/.test(word)) {
-    return word;
-  }
-
-  if (/^\d{4}s$/.test(word)) {
-    return word;
-  }
-
-  if (/^\d{4}$/.test(word)) {
+  if (/^\d+$/.test(word) || /^\d{4}s$/.test(word) || /^\d{4}$/.test(word)) {
     return word;
   }
 
@@ -150,31 +167,42 @@ function formatProjectTitle(projectId) {
     .replace(/\bWith\b/g, "with");
 }
 
-function getSignalChips(project) {
-  const chips = [];
-
-  if (project.public_input_summary) {
-    chips.push({ emoji: "💬", label: "Public input" });
-  }
-
-  if ((project.top_unresolved_questions || []).length > 0) {
-    chips.push({ emoji: "⚠", label: "Open questions" });
-  }
-
-  const moneyValue = Math.max(project.money_adopted_total || 0, project.money_discussed_total || 0);
-  if (moneyValue > 0) {
-    chips.push({ emoji: "💰", label: formatCurrency(moneyValue) });
-  }
-
-  return chips;
-}
-
 function getStatusLabel(status) {
   if (status === "no_formal_action") {
     return "No action";
   }
 
   return status.replace(/_/g, " ");
+}
+
+function formatTrackingClass(trackingClass) {
+  return trackingClass.replace(/_/g, " ");
+}
+
+function getPrimaryMoney(project) {
+  return project.money_latest_adopted || project.money_adopted_total || project.money_discussed_total || 0;
+}
+
+function getListBadges(project) {
+  const badges = [];
+
+  if ((project.public_comment_count || 0) > 0 || project.public_input_summary) {
+    badges.push("Public input");
+  }
+
+  if ((project.top_unresolved_questions || []).length > 0) {
+    badges.push("Open questions");
+  }
+
+  if ((project.split_vote_count || 0) > 0) {
+    badges.push("Split vote");
+  }
+
+  if (project.is_named_city_program_or_plan) {
+    badges.push("Program / Plan");
+  }
+
+  return badges;
 }
 
 function buildSearchText(project) {
@@ -188,6 +216,7 @@ function buildSearchText(project) {
     project.council_discussion_summary,
     ...(project.top_unresolved_questions || []),
     ...(project.recent_timeline || []).map((item) => item.summary),
+    ...((project.notable_quotes || []).flatMap((item) => [item.quote, item.speaker])),
   ]
     .filter(Boolean)
     .join(" ")
@@ -195,152 +224,226 @@ function buildSearchText(project) {
 }
 
 function buildProjects(rawProjects) {
-  return rawProjects
-    .map((project) => {
-      const title = formatProjectTitle(project.project_id);
-      const signals = getSignalChips(project);
-      return {
-        ...project,
-        title,
-        signals,
-        searchText: buildSearchText({ ...project, title }),
-      };
-    })
-    .sort((a, b) => {
-      if (a.category !== b.category) {
-        return a.category.localeCompare(b.category);
-      }
-
-      if (a.last_action_date !== b.last_action_date) {
-        return b.last_action_date.localeCompare(a.last_action_date);
-      }
-
-      return a.title.localeCompare(b.title);
-    });
+  return rawProjects.map((project) => {
+    const title = formatProjectTitle(project.project_id);
+    return {
+      ...project,
+      title,
+      listBadges: getListBadges(project),
+      primaryMoney: getPrimaryMoney(project),
+      searchText: buildSearchText({ ...project, title }),
+    };
+  });
 }
 
-function groupProjects(projects) {
-  const byCategory = new Map();
+function buildOptionMarkup(options, selectedValue) {
+  return options
+    .map((option) => `<option value="${option.value}"${option.value === selectedValue ? " selected" : ""}>${option.label}</option>`)
+    .join("");
+}
 
-  for (const project of projects) {
-    if (!byCategory.has(project.category)) {
-      byCategory.set(project.category, []);
+function updateFilterControls() {
+  const categories = [...new Set(state.allProjects.map((project) => project.category))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((category) => ({ value: category, label: category }));
+
+  const statuses = [...new Set(state.allProjects.map((project) => project.status_label))]
+    .sort((a, b) => getStatusLabel(a).localeCompare(getStatusLabel(b)))
+    .map((status) => ({ value: status, label: getStatusLabel(status) }));
+
+  const trackingClasses = [...new Set(state.allProjects.map((project) => project.tracking_class))]
+    .sort((a, b) => formatTrackingClass(a).localeCompare(formatTrackingClass(b)))
+    .map((trackingClass) => ({ value: trackingClass, label: formatTrackingClass(trackingClass) }));
+
+  categoryFilterEl.innerHTML = buildOptionMarkup(
+    [{ value: "all", label: "All categories" }, ...categories],
+    state.filters.category
+  );
+  statusFilterEl.innerHTML = buildOptionMarkup(
+    [{ value: "all", label: "All statuses" }, ...statuses],
+    state.filters.status
+  );
+  trackingFilterEl.innerHTML = buildOptionMarkup(
+    [{ value: "all", label: "All project types" }, ...trackingClasses],
+    state.filters.trackingClass
+  );
+  sortFilterEl.innerHTML = buildOptionMarkup(SORT_OPTIONS, state.sortBy);
+
+  const toggles = [
+    { key: "hasPublicInput", label: "Has public input" },
+    { key: "hasOpenQuestions", label: "Open questions" },
+    { key: "fundingAttached", label: "Funding attached" },
+    { key: "hasSplitVote", label: "Split vote" },
+  ];
+
+  quickFiltersEl.innerHTML = toggles
+    .map(
+      (toggle) => `
+        <button
+          class="filter-chip${state.filters[toggle.key] ? " active" : ""}"
+          type="button"
+          data-toggle-filter="${toggle.key}"
+          aria-pressed="${state.filters[toggle.key] ? "true" : "false"}"
+        >
+          ${toggle.label}
+        </button>
+      `
+    )
+    .join("");
+}
+
+function sortProjects(projects) {
+  const items = [...projects];
+
+  items.sort((a, b) => {
+    let primaryDiff = 0;
+
+    if (state.sortBy === "discussion") {
+      primaryDiff = (b.total_time_spent_this_term_seconds || 0) - (a.total_time_spent_this_term_seconds || 0);
+    } else if (state.sortBy === "public_input") {
+      primaryDiff = (b.public_comment_count || 0) - (a.public_comment_count || 0);
+      if (!primaryDiff) {
+        primaryDiff = Number(Boolean(b.public_input_summary)) - Number(Boolean(a.public_input_summary));
+      }
+    } else if (state.sortBy === "funding") {
+      primaryDiff = (b.primaryMoney || 0) - (a.primaryMoney || 0);
+    } else {
+      primaryDiff = (b.last_action_date || "").localeCompare(a.last_action_date || "");
     }
 
-    byCategory.get(project.category).push(project);
-  }
+    if (primaryDiff) {
+      return primaryDiff;
+    }
 
-  return Array.from(byCategory.entries())
-    .map(([name, items]) => ({
-      name,
-      color: CATEGORY_COLORS[name] || "#2f6fb0",
-      projects: items.sort((a, b) => b.last_action_date.localeCompare(a.last_action_date) || a.title.localeCompare(b.title)),
-    }))
-    .sort((a, b) => b.projects.length - a.projects.length || a.name.localeCompare(b.name));
+    if ((b.last_action_date || "") !== (a.last_action_date || "")) {
+      return (b.last_action_date || "").localeCompare(a.last_action_date || "");
+    }
+
+    return a.title.localeCompare(b.title);
+  });
+
+  return items;
 }
 
-function updateHeroStats() {
-  const projects = state.allProjects;
-  const totalFunding = projects.reduce((sum, project) => sum + (project.money_adopted_total || 0), 0);
-  const publicInputCount = projects.filter((project) => project.public_input_summary).length;
-  const openQuestionCount = projects.filter((project) => (project.top_unresolved_questions || []).length > 0).length;
-  const activeCount = projects.filter((project) => project.status_label === "active" || project.status_label === "introduced").length;
+function filterAndSortProjects() {
+  const term = state.searchTerm.trim().toLowerCase();
 
-  heroStatsEl.innerHTML = `
-    <div class="hero-card">
-      <span class="hero-card-value">${projects.length}</span>
-      <span class="hero-card-label">Projects in the current prototype dataset</span>
-    </div>
-    <div class="hero-card">
-      <span class="hero-card-value">${formatCurrency(totalFunding)}</span>
-      <span class="hero-card-label">Funding discussed or adopted across tracked items</span>
-    </div>
-    <div class="hero-card">
-      <span class="hero-card-value">${activeCount}</span>
-      <span class="hero-card-label">Projects still active or newly introduced</span>
-    </div>
-    <div class="hero-card">
-      <span class="hero-card-value">${publicInputCount + openQuestionCount}</span>
-      <span class="hero-card-label">Items with public input or unresolved questions</span>
-    </div>
-  `;
+  const filtered = state.allProjects.filter((project) => {
+    if (term && !project.searchText.includes(term)) {
+      return false;
+    }
+
+    if (state.filters.category !== "all" && project.category !== state.filters.category) {
+      return false;
+    }
+
+    if (state.filters.status !== "all" && project.status_label !== state.filters.status) {
+      return false;
+    }
+
+    if (state.filters.trackingClass !== "all" && project.tracking_class !== state.filters.trackingClass) {
+      return false;
+    }
+
+    if (state.filters.hasPublicInput && !((project.public_comment_count || 0) > 0 || project.public_input_summary)) {
+      return false;
+    }
+
+    if (state.filters.hasOpenQuestions && !(project.top_unresolved_questions || []).length) {
+      return false;
+    }
+
+    if (state.filters.fundingAttached && !(project.primaryMoney > 0)) {
+      return false;
+    }
+
+    if (state.filters.hasSplitVote && !((project.split_vote_count || 0) > 0)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  state.visibleProjects = sortProjects(filtered);
+
+  if (!state.visibleProjects.some((project) => project.project_id === state.selectedProjectId)) {
+    state.selectedProjectId = state.visibleProjects[0]?.project_id || null;
+    updateHash(state.selectedProjectId);
+  }
 }
 
 function renderSidebar() {
-  if (!state.filteredCategories.length) {
+  if (!state.visibleProjects.length) {
     sidebarScroll.innerHTML = `
       <div class="empty-message">
         <div>
           <div class="empty-title">No matches</div>
-          <div class="empty-sub">Try a broader search term or clear the search to browse every project.</div>
+          <div class="empty-sub">Try relaxing a filter or broadening the search to see more tracked projects.</div>
         </div>
       </div>
     `;
     return;
   }
 
-  sidebarScroll.innerHTML = state.filteredCategories
-    .map((category) => {
-      const isOpen = state.openCategories.has(category.name);
-      const projectList = isOpen
-        ? `
-          <div class="project-list">
-            ${category.projects
-              .map((project) => {
-                const signalsMarkup = project.signals.length
-                  ? `<div class="signals">${project.signals
-                      .map((signal) => `<span class="sig">${signal.emoji} ${signal.label}</span>`)
-                      .join("")}</div>`
-                  : "";
+  sidebarScroll.innerHTML = `
+    <div class="results-summary">
+      <div class="results-title">${state.visibleProjects.length} tracked ${state.visibleProjects.length === 1 ? "project" : "projects"}</div>
+      <div class="results-sub">Sorted by ${SORT_OPTIONS.find((option) => option.value === state.sortBy)?.label.toLowerCase() || "recent activity"}</div>
+    </div>
+    <div class="project-list project-list-flat">
+      ${state.visibleProjects
+        .map((project) => {
+          const badgesMarkup = project.listBadges.length
+            ? `<div class="row-badges">${project.listBadges.map((badge) => `<span class="mini-chip">${badge}</span>`).join("")}</div>`
+            : "";
 
-                return `
-                  <button
-                    class="project-row${project.project_id === state.selectedProjectId ? " active" : ""}"
-                    type="button"
-                    data-project-id="${project.project_id}"
-                    style="--category-color:${category.color}"
-                  >
-                    <span class="proj-main">
-                      <span class="proj-title">${project.title}</span>
-                      <span class="proj-summary">${project.one_sentence_summary}</span>
-                    </span>
-                    <span class="proj-meta">
-                      <span class="status-pill status-${project.status_label}">${getStatusLabel(project.status_label)}</span>
-                      ${signalsMarkup}
-                    </span>
-                  </button>
-                `;
-              })
-              .join("")}
-          </div>
-        `
-        : "";
-
-      return `
-        <section class="cat-section">
-          <button class="cat-header" type="button" data-category-name="${category.name}">
-            <span class="cat-left">
-              <span class="cat-dot" style="background:${category.color}"></span>
-              <span class="cat-name">${category.name}</span>
-            </span>
-            <span class="cat-right">
-              <span class="cat-count">${category.projects.length}</span>
-              <span class="chevron${isOpen ? " open" : ""}">▶</span>
-            </span>
-          </button>
-          ${projectList}
-        </section>
-      `;
-    })
-    .join("");
+          return `
+            <button
+              class="project-row${project.project_id === state.selectedProjectId ? " active" : ""}"
+              type="button"
+              data-project-id="${project.project_id}"
+              style="--category-color:${CATEGORY_COLORS[project.category] || "#2f6fb0"}"
+            >
+              <span class="proj-topline">
+                <span class="proj-category">${project.category}</span>
+                <span class="status-pill status-${project.status_label}">${getStatusLabel(project.status_label)}</span>
+              </span>
+              <span class="proj-title">${project.title}</span>
+              <span class="proj-summary proj-current-status">${project.current_status || project.one_sentence_summary}</span>
+              <span class="proj-meta-line">
+                <span>${formatDate(project.last_action_date)}</span>
+                <span>${formatTrackingClass(project.tracking_class)}</span>
+              </span>
+              <span class="proj-metrics">
+                <span class="metric-chip">${formatDuration(project.total_time_spent_this_term_seconds || 0)} discussion</span>
+                <span class="metric-chip">${project.vote_count || 0} ${project.vote_count === 1 ? "vote" : "votes"}</span>
+                <span class="metric-chip">${project.public_comment_count || 0} public comments</span>
+                ${project.primaryMoney > 0 ? `<span class="metric-chip">${formatCurrency(project.primaryMoney)}</span>` : ""}
+              </span>
+              ${badgesMarkup}
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
 }
 
-function createMetric(label, value) {
+function createMetric(label, value, accent = false) {
   return `
-    <div class="metric">
+    <div class="metric${accent ? " metric-accent" : ""}">
       <div class="metric-label">${label}</div>
       <div class="metric-value">${value}</div>
     </div>
+  `;
+}
+
+function createDetailSection(label, bodyMarkup, extraClass = "") {
+  return `
+    <section class="section-card${extraClass ? ` ${extraClass}` : ""}">
+      <p class="section-label">${label}</p>
+      ${bodyMarkup}
+    </section>
   `;
 }
 
@@ -359,9 +462,9 @@ function renderDetail() {
               <line x1="13" y1="31" x2="24" y2="31" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </svg>
           </div>
-          <div class="main-empty-title">Select a project</div>
+          <div class="main-empty-title">No project selected</div>
           <div class="main-empty-sub">
-            Browse categories on the left and open any project briefing to inspect decisions, money, timeline, and community impact.
+            Pick a project from the left to open a tracking brief with status, context, money, discussion, and timeline.
           </div>
         </div>
       </div>
@@ -371,110 +474,140 @@ function renderDetail() {
 
   const categoryColor = CATEGORY_COLORS[project.category] || "#2f6fb0";
   const metrics = [
-    createMetric("Funding", formatLongCurrency(Math.max(project.money_adopted_total || 0, project.money_discussed_total || 0))),
-    createMetric("Votes", project.vote_count ? `${project.vote_count} recorded` : "No vote"),
-    createMetric("Split votes", project.split_vote_count ? `${project.split_vote_count}` : "None"),
-    createMetric("Tracking class", project.tracking_class.replace(/_/g, " ")),
-    createMetric("Timeline items", `${(project.recent_timeline || []).length}`),
-    createMetric("Segments linked", `${(project.linked_meeting_segments || []).length}`),
+    createMetric("Funding", formatLongCurrency(project.primaryMoney), project.primaryMoney > 0),
+    createMetric("Votes", `${project.vote_count || 0}`),
+    createMetric("Public comments", `${project.public_comment_count || 0}`),
+    createMetric("Discussion time", formatDuration(project.total_time_spent_this_term_seconds || 0)),
+    createMetric("Open questions", `${(project.top_unresolved_questions || []).length}`),
+    createMetric("Split votes", `${project.split_vote_count || 0}`),
   ].join("");
 
-  const timelineMarkup = (project.recent_timeline || [])
-    .map(
-      (item) => `
-        <div class="timeline-item">
-          <div class="timeline-marker"></div>
-          <div class="timeline-date">${formatDate(item.date)}</div>
-          <div class="timeline-text">${item.summary}</div>
-        </div>
-      `
-    )
-    .join("");
+  const evidenceCards = [];
 
-  const questionMarkup = (project.top_unresolved_questions || []).length
+  if (project.council_discussion_summary) {
+    evidenceCards.push(
+      createDetailSection(
+        "Council Discussion",
+        `<p class="body-text">${project.council_discussion_summary}</p>`
+      )
+    );
+  }
+
+  if (project.public_input_summary) {
+    evidenceCards.push(
+      createDetailSection(
+        "Public Input",
+        `<p class="body-text">${project.public_input_summary}</p>`
+      )
+    );
+  }
+
+  if ((project.top_unresolved_questions || []).length > 0) {
+    evidenceCards.push(
+      createDetailSection(
+        "Open Questions",
+        `
+          <div class="question-list">
+            ${project.top_unresolved_questions
+              .map(
+                (question) => `
+                  <div class="question-item">
+                    <div class="question-icon">?</div>
+                    <div class="body-text">${question}</div>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        `
+      )
+    );
+  }
+
+  if ((project.notable_quotes || []).length > 0) {
+    evidenceCards.push(
+      createDetailSection(
+        "Notable Quotes",
+        `
+          <div class="quote-list">
+            ${project.notable_quotes
+              .slice(0, 3)
+              .map(
+                (item) => `
+                  <figure class="quote-card">
+                    <blockquote class="quote-text">"${item.quote}"</blockquote>
+                    <figcaption class="quote-meta">
+                      <span>${item.speaker || "Unknown speaker"}</span>
+                      <span>${formatDate(item.meeting_date)}</span>
+                      ${item.timestamp ? `<span>${item.timestamp}</span>` : ""}
+                    </figcaption>
+                  </figure>
+                `
+              )
+              .join("")}
+          </div>
+        `,
+        "section-card-wide"
+      )
+    );
+  }
+
+  const timelineMarkup = (project.recent_timeline || []).length
     ? `
-      <div class="question-list">
-        ${project.top_unresolved_questions
+      <div class="timeline-list">
+        ${project.recent_timeline
           .map(
-            (question) => `
-              <div class="question-item">
-                <div class="question-icon">?</div>
-                <div class="body-text">${question}</div>
+            (item) => `
+              <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-date">${formatDate(item.date)}</div>
+                <div class="timeline-text">${item.summary}</div>
               </div>
             `
           )
           .join("")}
       </div>
     `
-    : `<p class="body-text">No unresolved questions are surfaced in the current project view.</p>`;
-
-  const signalsMarkup = project.signals.length
-    ? `<div class="inline-list">${project.signals
-        .map((signal) => `<span class="chip">${signal.emoji} ${signal.label}</span>`)
-        .join("")}</div>`
-    : `<p class="body-text">No special signals were flagged for this project.</p>`;
+    : `<p class="body-text">No timeline entries are available yet for this project.</p>`;
 
   detailPanel.innerHTML = `
     <div class="detail-shell" style="--category-color:${categoryColor}">
-      <div class="detail-main">
+      <div class="detail-main detail-main-full">
         <header class="detail-header">
-          <div class="detail-tag">
-            <span class="cat-dot" style="background:${categoryColor}"></span>
-            ${project.category}
+          <div class="detail-tag-row">
+            <div class="detail-tag">
+              <span class="cat-dot" style="background:${categoryColor}"></span>
+              ${project.category}
+            </div>
+            <div class="detail-metadata">
+              <span class="meta-chip">${formatTrackingClass(project.tracking_class)}</span>
+              ${project.is_named_city_program_or_plan ? `<span class="meta-chip">Program / Plan</span>` : ""}
+            </div>
           </div>
-          <h2 class="detail-title">${project.title}</h2>
           <div class="detail-status-row">
             <span class="status-pill status-${project.status_label}">${getStatusLabel(project.status_label)}</span>
             <span>Last action: ${formatDate(project.last_action_date)}</span>
-            <span>${formatDuration(project.total_time_spent_this_term_seconds || 0)}</span>
           </div>
-          <div class="detail-current-status">${project.current_status}</div>
+          <h2 class="detail-title">${project.title}</h2>
+          <div class="detail-current-status">${project.current_status || project.one_sentence_summary}</div>
+          <p class="detail-summary">${project.one_sentence_summary}</p>
         </header>
 
         <div class="content-grid">
-          <section class="section-card">
-            <p class="section-label">Summary</p>
-            <p class="summary-text">${project.one_sentence_summary}</p>
-          </section>
+          ${project.why_this_matters_locally
+            ? createDetailSection(
+                "Why It Matters",
+                `<p class="matters-text">${project.why_this_matters_locally}</p>`
+              )
+            : ""}
 
-          <section class="section-card">
-            <p class="section-label">Why This Matters</p>
-            <p class="matters-text">${project.why_this_matters_locally}</p>
-          </section>
+          ${createDetailSection("Key Metrics", `<div class="metrics">${metrics}</div>`)}
 
-          <section class="section-card">
-            <p class="section-label">Key Metrics</p>
-            <div class="metrics">${metrics}</div>
-          </section>
+          ${evidenceCards.join("")}
 
-          <section class="section-card">
-            <p class="section-label">Timeline</p>
-            <div class="timeline-list">${timelineMarkup || `<p class="body-text">No recent timeline items are available.</p>`}</div>
-          </section>
+          ${createDetailSection("Timeline", timelineMarkup, "section-card-wide")}
         </div>
       </div>
-
-      <aside class="detail-rail">
-        <section class="rail-card">
-          <p class="section-label">Signals</p>
-          ${signalsMarkup}
-        </section>
-
-        <section class="rail-card">
-          <p class="section-label">Open Questions</p>
-          ${questionMarkup}
-        </section>
-
-        <section class="rail-card">
-          <p class="section-label">Council Discussion</p>
-          <p class="body-text">${project.council_discussion_summary || "No council discussion summary is available for this project."}</p>
-        </section>
-
-        <section class="rail-card">
-          <p class="section-label">Public Input</p>
-          <p class="body-text">${project.public_input_summary || "No public input summary is available for this project."}</p>
-        </section>
-      </aside>
     </div>
   `;
 }
@@ -493,52 +626,58 @@ function updateHash(projectId) {
   }
 }
 
-function applySearch() {
-  const term = state.searchTerm.trim().toLowerCase();
-  const filteredProjects = term
-    ? state.allProjects.filter((project) => project.searchText.includes(term))
-    : state.allProjects;
-
-  state.filteredCategories = groupProjects(filteredProjects);
-
-  if (!state.filteredCategories.some((category) => category.projects.some((project) => project.project_id === state.selectedProjectId))) {
-    state.selectedProjectId = null;
-    updateHash("");
-  }
-
-  if (term) {
-    state.openCategories = new Set(state.filteredCategories.map((category) => category.name));
-  } else if (!state.openCategories.size && state.filteredCategories[0]) {
-    state.openCategories.add(state.filteredCategories[0].name);
-  }
-
+function applyFiltersAndRender() {
+  filterAndSortProjects();
   renderSidebar();
   renderDetail();
 }
 
 function bindSidebarEvents() {
   sidebarScroll.addEventListener("click", (event) => {
-    const categoryButton = event.target.closest("[data-category-name]");
-    if (categoryButton) {
-      const categoryName = categoryButton.dataset.categoryName;
-      if (state.openCategories.has(categoryName)) {
-        state.openCategories.delete(categoryName);
-      } else {
-        state.openCategories.add(categoryName);
-      }
-
-      renderSidebar();
+    const projectButton = event.target.closest("[data-project-id]");
+    if (!projectButton) {
       return;
     }
 
-    const projectButton = event.target.closest("[data-project-id]");
-    if (projectButton) {
-      const projectId = projectButton.dataset.projectId;
-      state.selectedProjectId = projectId;
-      updateHash(projectId);
-      renderSidebar();
-      renderDetail();
+    const projectId = projectButton.dataset.projectId;
+    state.selectedProjectId = projectId;
+    updateHash(projectId);
+    renderSidebar();
+    renderDetail();
+  });
+}
+
+function bindControlEvents() {
+  categoryFilterEl.addEventListener("change", (event) => {
+    state.filters.category = event.target.value;
+    applyFiltersAndRender();
+  });
+
+  statusFilterEl.addEventListener("change", (event) => {
+    state.filters.status = event.target.value;
+    applyFiltersAndRender();
+  });
+
+  trackingFilterEl.addEventListener("change", (event) => {
+    state.filters.trackingClass = event.target.value;
+    applyFiltersAndRender();
+  });
+
+  sortFilterEl.addEventListener("change", (event) => {
+    state.sortBy = event.target.value;
+    applyFiltersAndRender();
+  });
+
+  quickFiltersEl.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-toggle-filter]");
+    if (!chip) {
+      return;
     }
+
+    const key = chip.dataset.toggleFilter;
+    state.filters[key] = !state.filters[key];
+    updateFilterControls();
+    applyFiltersAndRender();
   });
 }
 
@@ -553,8 +692,8 @@ function updateHeader(projects) {
 
   governingBodyEl.textContent = state.governingBody;
   sidebarSubtitleEl.textContent = state.latestYear
-    ? `Recent activity · ${state.latestYear}`
-    : "Recent activity";
+    ? `Tracking desk · ${state.latestYear}`
+    : "Tracking desk";
 }
 
 async function loadProjects() {
@@ -575,14 +714,39 @@ async function loadProjects() {
   state.allProjects = buildProjects(rawProjects);
   updateHeader(state.allProjects);
   updateHeroStats();
+  updateFilterControls();
 
   syncSelectionFromHash();
+  applyFiltersAndRender();
+}
 
-  if (!state.selectedProjectId && state.allProjects[0]) {
-    state.openCategories.add(state.allProjects[0].category);
-  }
+function updateHeroStats() {
+  const projects = state.allProjects;
+  const totalFunding = projects.reduce((sum, project) => sum + (project.money_adopted_total || 0), 0);
+  const activeCount = projects.filter((project) => ["active", "introduced"].includes(project.status_label)).length;
+  const discussedCount = projects.filter((project) => (project.total_time_spent_this_term_seconds || 0) >= 300).length;
+  const watchlistCount = projects.filter(
+    (project) => (project.top_unresolved_questions || []).length > 0 || project.public_input_summary
+  ).length;
 
-  applySearch();
+  heroStatsEl.innerHTML = `
+    <div class="hero-card">
+      <span class="hero-card-value">${projects.length}</span>
+      <span class="hero-card-label">Projects in the current prototype dataset</span>
+    </div>
+    <div class="hero-card">
+      <span class="hero-card-value">${formatCurrency(totalFunding)}</span>
+      <span class="hero-card-label">Adopted funding tied to tracked decisions and initiatives</span>
+    </div>
+    <div class="hero-card">
+      <span class="hero-card-value">${activeCount}</span>
+      <span class="hero-card-label">Items still active or newly introduced</span>
+    </div>
+    <div class="hero-card">
+      <span class="hero-card-value">${watchlistCount + discussedCount}</span>
+      <span class="hero-card-label">Projects with heat: debate, input, or unresolved questions</span>
+    </div>
+  `;
 }
 
 function showLoadError(error) {
@@ -598,7 +762,7 @@ function showLoadError(error) {
 
 searchInput.addEventListener("input", (event) => {
   state.searchTerm = event.target.value;
-  applySearch();
+  applyFiltersAndRender();
 });
 
 window.addEventListener("hashchange", () => {
@@ -611,4 +775,5 @@ window.addEventListener("hashchange", () => {
 });
 
 bindSidebarEvents();
+bindControlEvents();
 loadProjects().catch(showLoadError);
