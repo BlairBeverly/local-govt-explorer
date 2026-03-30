@@ -3,89 +3,71 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Local Government Explorer</title>
+    <title>Champaign Civic Tracker</title>
     <meta
       name="description"
-      content="Explore Champaign local government projects by category, status, timeline, and community impact."
+      content="Plain-language briefings on Champaign City Council projects, decisions, debates, and unresolved issues."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="page-shell">
-      <header class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Prototype</p>
-          <h1>Track what Champaign is doing without sitting through every meeting.</h1>
-          <p class="hero-text">
-            Browse live project briefings built from council activity, grouped by topic and
-            compressed into timelines, funding, votes, and open questions.
-          </p>
-        </div>
+      <header class="hero hero-desktop">
+        <p class="hero-eyebrow">Prototype · Champaign, IL</p>
+        <h1 class="hero-title">Track what Champaign is doing without sitting through every meeting.</h1>
+        <p class="hero-subtitle">Council decisions, debates, and unresolved issues translated into plain language.</p>
         <div class="hero-stats" id="hero-stats" aria-label="Project summary"></div>
       </header>
 
-      <main class="app" aria-live="polite">
-        <aside class="sidebar" aria-label="Project navigation">
-          <div class="sidebar-header">
-            <div class="sidebar-title" id="governing-body">Loading council data...</div>
-            <div class="sidebar-sub" id="sidebar-subtitle">Preparing project explorer</div>
-          </div>
+      <header class="mobile-banner" aria-label="App summary">
+        <div class="mobile-banner-copy">
+          <p class="mobile-banner-eyebrow">Champaign, IL · 2026</p>
+          <h1 class="mobile-banner-title">Track what Champaign is doing.</h1>
+          <p class="mobile-banner-subtitle">Council briefings compressed into what actually matters.</p>
+        </div>
+        <div class="mobile-banner-stats" id="mobile-banner-stats"></div>
+      </header>
 
-          <div class="search-bar">
-            <label class="sr-only" for="project-search">Search projects</label>
-            <input
-              id="project-search"
-              type="search"
-              placeholder="Search projects, topics, speakers, questions..."
-              autocomplete="off"
-            />
-          </div>
-
-          <div class="sidebar-controls" aria-label="Tracking filters">
-            <div class="control-grid">
-              <label class="control-field">
-                <span class="control-label">Category</span>
-                <select id="category-filter"></select>
-              </label>
-              <label class="control-field">
-                <span class="control-label">Status</span>
-                <select id="status-filter"></select>
-              </label>
-              <label class="control-field">
-                <span class="control-label">Sort</span>
-                <select id="sort-filter"></select>
-              </label>
-            </div>
-            <div class="quick-filters" id="quick-filters"></div>
-          </div>
-
-          <div class="sidebar-scroll" id="sidebar-scroll"></div>
-        </aside>
-
-        <section class="detail" id="detail-panel">
-          <div class="main-empty" id="empty-state">
-            <div class="empty-illustration" aria-hidden="true">
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                <rect x="5" y="7" width="38" height="34" rx="6" stroke="currentColor" stroke-width="1.5" />
-                <line x1="13" y1="17" x2="35" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                <line x1="13" y1="24" x2="30" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                <line x1="13" y1="31" x2="24" y2="31" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <section class="filter-bar" aria-label="Project filters">
+        <div class="filter-inner">
+          <div class="filter-search-row">
+            <label class="search-wrap" for="project-search">
+              <svg class="search-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
+                <line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               </svg>
-            </div>
-            <div class="main-empty-title">Select a project</div>
-            <div class="main-empty-sub">
-              Choose any project from the left to open a tracking brief with the latest
-              status, why it matters, funding, discussion, and meeting history.
-            </div>
+              <span class="sr-only">Search projects</span>
+              <input id="project-search" type="search" placeholder="Search projects, topics, speakers…" autocomplete="off" />
+            </label>
           </div>
-        </section>
+
+          <div class="filter-row">
+            <span class="row-label">Topic</span>
+            <div class="chips-row" id="topic-chips"></div>
+          </div>
+
+          <div class="filter-row filter-row-last">
+            <span class="row-label">Filter</span>
+            <div class="chips-row" id="attribute-chips"></div>
+          </div>
+        </div>
+      </section>
+
+      <main class="feed-shell">
+        <div class="result-count" id="result-count">Loading projects…</div>
+        <div class="cards-grid" id="cards-grid" aria-live="polite"></div>
       </main>
+    </div>
+
+    <div class="detail-layer hidden" id="detail-layer" aria-hidden="true">
+      <button class="detail-backdrop" id="detail-backdrop" type="button" aria-label="Close project detail"></button>
+      <aside class="detail-panel" id="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detail-title"></aside>
     </div>
 
     <script src="./app.js" defer></script>
