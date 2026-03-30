@@ -32,6 +32,7 @@ const SORT_OPTIONS = [
 const state = {
   allProjects: [],
   visibleProjects: [],
+  groupedProjects: [],
   selectedProjectId: null,
   searchTerm: "",
   governingBody: "",
@@ -39,13 +40,13 @@ const state = {
   filters: {
     category: "all",
     status: "all",
-    trackingClass: "all",
     hasPublicInput: false,
     hasOpenQuestions: false,
     fundingAttached: false,
     hasSplitVote: false,
   },
   sortBy: "recent",
+  expandedCategories: new Set(),
 };
 
 const sidebarScroll = document.getElementById("sidebar-scroll");
@@ -56,7 +57,6 @@ const sidebarSubtitleEl = document.getElementById("sidebar-subtitle");
 const heroStatsEl = document.getElementById("hero-stats");
 const categoryFilterEl = document.getElementById("category-filter");
 const statusFilterEl = document.getElementById("status-filter");
-const trackingFilterEl = document.getElementById("tracking-filter");
 const sortFilterEl = document.getElementById("sort-filter");
 const quickFiltersEl = document.getElementById("quick-filters");
 
@@ -242,6 +242,26 @@ function buildOptionMarkup(options, selectedValue) {
     .join("");
 }
 
+function groupVisibleProjects(projects) {
+  const grouped = new Map();
+
+  for (const project of projects) {
+    if (!grouped.has(project.category)) {
+      grouped.set(project.category, []);
+    }
+
+    grouped.get(project.category).push(project);
+  }
+
+  return [...grouped.entries()]
+    .map(([name, items]) => ({
+      name,
+      color: CATEGORY_COLORS[name] || "#2f6fb0",
+      projects: items,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function updateFilterControls() {
   const categories = [...new Set(state.allProjects.map((project) => project.category))]
     .sort((a, b) => a.localeCompare(b))
@@ -251,10 +271,6 @@ function updateFilterControls() {
     .sort((a, b) => getStatusLabel(a).localeCompare(getStatusLabel(b)))
     .map((status) => ({ value: status, label: getStatusLabel(status) }));
 
-  const trackingClasses = [...new Set(state.allProjects.map((project) => project.tracking_class))]
-    .sort((a, b) => formatTrackingClass(a).localeCompare(formatTrackingClass(b)))
-    .map((trackingClass) => ({ value: trackingClass, label: formatTrackingClass(trackingClass) }));
-
   categoryFilterEl.innerHTML = buildOptionMarkup(
     [{ value: "all", label: "All categories" }, ...categories],
     state.filters.category
@@ -262,10 +278,6 @@ function updateFilterControls() {
   statusFilterEl.innerHTML = buildOptionMarkup(
     [{ value: "all", label: "All statuses" }, ...statuses],
     state.filters.status
-  );
-  trackingFilterEl.innerHTML = buildOptionMarkup(
-    [{ value: "all", label: "All project types" }, ...trackingClasses],
-    state.filters.trackingClass
   );
   sortFilterEl.innerHTML = buildOptionMarkup(SORT_OPTIONS, state.sortBy);
 
@@ -341,10 +353,6 @@ function filterAndSortProjects() {
       return false;
     }
 
-    if (state.filters.trackingClass !== "all" && project.tracking_class !== state.filters.trackingClass) {
-      return false;
-    }
-
     if (state.filters.hasPublicInput && !((project.public_comment_count || 0) > 0 || project.public_input_summary)) {
       return false;
     }
@@ -365,10 +373,15 @@ function filterAndSortProjects() {
   });
 
   state.visibleProjects = sortProjects(filtered);
+  state.groupedProjects = groupVisibleProjects(state.visibleProjects);
 
   if (!state.visibleProjects.some((project) => project.project_id === state.selectedProjectId)) {
     state.selectedProjectId = state.visibleProjects[0]?.project_id || null;
     updateHash(state.selectedProjectId);
+  }
+
+  if (!state.expandedCategories.size && state.groupedProjects.length) {
+    state.expandedCategories.add(state.groupedProjects[0].name);
   }
 }
 
@@ -390,42 +403,59 @@ function renderSidebar() {
       <div class="results-title">${state.visibleProjects.length} tracked ${state.visibleProjects.length === 1 ? "project" : "projects"}</div>
       <div class="results-sub">Sorted by ${SORT_OPTIONS.find((option) => option.value === state.sortBy)?.label.toLowerCase() || "recent activity"}</div>
     </div>
-    <div class="project-list project-list-flat">
-      ${state.visibleProjects
-        .map((project) => {
-          const badgesMarkup = project.listBadges.length
-            ? `<div class="row-badges">${project.listBadges.map((badge) => `<span class="mini-chip">${badge}</span>`).join("")}</div>`
-            : "";
+    ${state.groupedProjects
+      .map((group) => {
+        const isExpanded = state.expandedCategories.has(group.name);
+        const visibleProjects = isExpanded ? group.projects : group.projects.slice(0, 4);
+        const remainingCount = group.projects.length - visibleProjects.length;
 
-          return `
-            <button
-              class="project-row${project.project_id === state.selectedProjectId ? " active" : ""}"
-              type="button"
-              data-project-id="${project.project_id}"
-              style="--category-color:${CATEGORY_COLORS[project.category] || "#2f6fb0"}"
-            >
-              <span class="proj-topline">
-                <span class="proj-category">${project.category}</span>
-                <span class="status-pill status-${project.status_label}">${getStatusLabel(project.status_label)}</span>
+        return `
+          <section class="cat-section grouped-section">
+            <div class="cat-header grouped-header">
+              <span class="cat-left">
+                <span class="cat-dot" style="background:${group.color}"></span>
+                <span class="cat-name">${group.name}</span>
               </span>
-              <span class="proj-title">${project.title}</span>
-              <span class="proj-summary proj-current-status">${project.current_status || project.one_sentence_summary}</span>
-              <span class="proj-meta-line">
-                <span>${formatDate(project.last_action_date)}</span>
-                <span>${formatTrackingClass(project.tracking_class)}</span>
-              </span>
-              <span class="proj-metrics">
-                <span class="metric-chip">${formatDuration(project.total_time_spent_this_term_seconds || 0)} discussion</span>
-                <span class="metric-chip">${project.vote_count || 0} ${project.vote_count === 1 ? "vote" : "votes"}</span>
-                <span class="metric-chip">${project.public_comment_count || 0} public comments</span>
-                ${project.primaryMoney > 0 ? `<span class="metric-chip">${formatCurrency(project.primaryMoney)}</span>` : ""}
-              </span>
-              ${badgesMarkup}
-            </button>
-          `;
-        })
-        .join("")}
-    </div>
+              <span class="cat-count">${group.projects.length}</span>
+            </div>
+            <div class="project-list">
+              ${visibleProjects
+                .map((project) => {
+                  const badgesMarkup = project.listBadges.length
+                    ? `<div class="row-badges">${project.listBadges.map((badge) => `<span class="mini-chip">${badge}</span>`).join("")}</div>`
+                    : "";
+
+                  return `
+                    <button
+                      class="project-row${project.project_id === state.selectedProjectId ? " active" : ""}"
+                      type="button"
+                      data-project-id="${project.project_id}"
+                      style="--category-color:${group.color}"
+                    >
+                      <span class="proj-topline">
+                        <span class="status-pill status-${project.status_label}">${getStatusLabel(project.status_label)}</span>
+                        <span class="proj-date">${formatDate(project.last_action_date)}</span>
+                      </span>
+                      <span class="proj-title">${project.title}</span>
+                      <span class="proj-summary proj-current-status">${project.current_status || project.one_sentence_summary}</span>
+                      <span class="proj-metrics">
+                        ${project.primaryMoney > 0 ? `<span class="metric-chip">${formatCurrency(project.primaryMoney)}</span>` : ""}
+                        ${project.public_comment_count || project.public_input_summary ? `<span class="metric-chip">${project.public_comment_count || 0} public comments</span>` : ""}
+                        ${(project.top_unresolved_questions || []).length ? `<span class="metric-chip">${(project.top_unresolved_questions || []).length} open questions</span>` : ""}
+                      </span>
+                      ${badgesMarkup}
+                    </button>
+                  `;
+                })
+                .join("")}
+              ${remainingCount > 0
+                ? `<button class="show-more-button" type="button" data-category-expand="${group.name}">Show ${remainingCount} more</button>`
+                : ""}
+            </div>
+          </section>
+        `;
+      })
+      .join("")}
   `;
 }
 
@@ -634,6 +664,13 @@ function applyFiltersAndRender() {
 
 function bindSidebarEvents() {
   sidebarScroll.addEventListener("click", (event) => {
+    const expandButton = event.target.closest("[data-category-expand]");
+    if (expandButton) {
+      state.expandedCategories.add(expandButton.dataset.categoryExpand);
+      renderSidebar();
+      return;
+    }
+
     const projectButton = event.target.closest("[data-project-id]");
     if (!projectButton) {
       return;
@@ -655,11 +692,6 @@ function bindControlEvents() {
 
   statusFilterEl.addEventListener("change", (event) => {
     state.filters.status = event.target.value;
-    applyFiltersAndRender();
-  });
-
-  trackingFilterEl.addEventListener("change", (event) => {
-    state.filters.trackingClass = event.target.value;
     applyFiltersAndRender();
   });
 
