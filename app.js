@@ -522,10 +522,9 @@ function updateHeroStats() {
     <div class="stat-card stat-card-optional stat-card-optional-wide"><span class="stat-num">${escapeHtml(formatDateRange(coverageDates))}</span><span class="stat-label">meeting coverage</span></div>
   `;
 
-  mobileBannerStatsEl.innerHTML = `
-    <div class="mobile-stat"><span class="mobile-stat-num">${state.projects.length}</span><span class="mobile-stat-label">projects</span></div>
-    <div class="mobile-stat"><span class="mobile-stat-num">${formatCurrency(totalFunding)}</span><span class="mobile-stat-label">decisions</span></div>
-  `;
+  if (mobileBannerStatsEl) {
+    mobileBannerStatsEl.innerHTML = "";
+  }
 }
 
 function renderTopicChips() {
