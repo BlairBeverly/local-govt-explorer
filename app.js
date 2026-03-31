@@ -288,6 +288,33 @@ function shortenQuote(text, maxLength = 110) {
   return result || normalized.slice(0, maxLength).trim();
 }
 
+function shortenForCard(text, maxLength = 190) {
+  const normalized = String(text || "").trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return "";
+  }
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  const clauses = normalized.split(/(?<=[,.;!?—])\s+/);
+  let result = "";
+  for (const clause of clauses) {
+    const candidate = result ? `${result} ${clause}` : clause;
+    if (candidate.length > maxLength) {
+      break;
+    }
+    result = candidate;
+  }
+
+  const useClauseBoundary = result && result.length >= maxLength * 0.72;
+  const trimmed = (useClauseBoundary ? result : normalized.slice(0, maxLength))
+    .trim()
+    .replace(/[.,;:!?—-]+$/, "");
+  return `${trimmed}...`;
+}
+
 function deriveTitleFromSummary(project) {
   if (TITLE_OVERRIDES[project.project_id]) {
     return TITLE_OVERRIDES[project.project_id];
@@ -484,6 +511,7 @@ function buildProject(rawProject) {
     categoryMeta,
     emoji: rawProject.emoji || deriveEmoji(rawProject, categoryMeta),
     hook: rawProject.hook || buildHook(rawProject),
+    cardHook: shortenForCard(rawProject.hook || buildHook(rawProject)),
     primaryMoney,
     discussionLabel,
     hasPublicComment,
@@ -657,7 +685,7 @@ function renderCards() {
             <span class="card-emoji">${project.emoji}</span>
             <div class="card-title">${escapeHtml(project.title)}</div>
           </div>
-          <div class="card-hook">${escapeHtml(project.hook)}</div>
+          <div class="card-hook">${escapeHtml(project.cardHook || project.hook)}</div>
           <div class="card-foot">
             <span class="card-foot-left card-foot-meta">
               <span class="foot-dot" style="background:${project.categoryMeta.dot}"></span>
