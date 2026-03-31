@@ -1,163 +1,231 @@
-# Local Government Explorer
+# Champaign Civic Tracker
 
 ## Overview
 
-TheLocal Government Explorer UI is a lightweight interface for exploring local government activity in a structured, accessible way.
+Champaign Civic Tracker is a lightweight frontend for browsing structured local-government project data.
 
-Instead of navigating full city council meetings, this UI presents:
+Instead of organizing information around meetings, the app organizes it around **projects**: ongoing civic stories like street work, housing policy, public safety issues, and downtown development.
 
-- Projects (ongoing or completed civic initiatives)
-- Grouped by category
-- With clear summaries, timelines, and key signals
+The app is designed to answer a few fast questions:
 
-The goal is simple:
+- What is the council working on right now?
+- What got approved?
+- Which projects have money, votes, comments, or long discussion behind them?
+- Why might a resident care?
 
-> Help residents, journalists, and stakeholders quickly understand what their city is doing—and why it matters.
+The UI is intentionally more like a civic feed than a dashboard.
 
----
+## Frontend Structure
 
-## Core Concepts
+### Feed-first layout
 
-### Projects (Primary Unit)
+It now has:
 
-A project represents a real-world civic initiative that may span:
-- multiple meetings
-- multiple votes
-- weeks or months of discussion
+- a desktop hero with summary stats
+- a simplified mobile header
+- a sticky filter bar
+- a responsive grid of project cards
+- a slide-in detail panel on desktop
+- a full-screen detail sheet on mobile
 
-Each project acts like a living briefing page.
+### Filter model
 
----
+There are two kinds of filter chips:
 
-### Categories (Navigation Layer)
+- **Topic chips**: single-select
+  - selecting a new topic replaces the previous topic
+  - selecting the active topic clears it
+- **Attribute chips**: multi-select
+  - these can be combined freely
 
-Projects are grouped into high-level categories such as:
+The search input filters live across:
 
-- Infrastructure & Transportation  
-- Housing & Development  
-- Public Safety  
-- Community & Social Services  
-- Economic Development & Downtown  
-- Governance & Policy  
-- City Operations & Finance  
-- Environment & Sustainability  
-- Community Recognition & Ceremonial  
+- title
+- hook
+- category label
+- summaries
+- quotes
+- open questions
 
----
+## Card Design
 
-### Signals (At-a-glance indicators)
+Each project card is built around four layers:
 
-- 💬 Public input occurred  
-- ⚠ Open questions remain  
-- 💰 Money involved  
+1. **Top signal row**
+   - up to three factual badges
+   - a status pill on the right
+2. **Headline row**
+   - emoji
+   - short project title
+3. **Hook**
+   - short editorial lead in serif
+4. **Footer**
+   - category
+   - last action date
 
----
+### Card badges
 
-## UI Structure
+Cards prioritize these factual signals:
 
-### Sidebar
+- funding amount
+- public comments
+- discussion time
+- vote result
 
-- Category accordion list
-- Project count per category
-- Expand/collapse interaction
-- Search bar (future)
+### Card status labels
 
-Each project row includes:
-- Title
-- Status badge
-- Signals (optional)
+Visible status labels include:
 
----
+- `approved`
+- `active`
+- `time-sensitive`
+- `no action`
 
-### Main Panel (Project Detail View)
+Note: `time-sensitive` is still derived in the frontend from heuristic logic. That should eventually move into backend-owned data.
 
-Displays structured project briefing.
+## Detail Panel
 
----
+The detail experience is a structured briefing page.
 
-## Project Detail Layout
+### Top of panel
 
-### Header
-- Category label
-- Project title
-- Status
-- Last action date
-- Total discussion time
+- category tag
+- status pill
+- title
+- last action date
+- total discussion time
+- editorial lead (`hook`)
 
-### Summary
-Plain-language explanation.
+### Main briefing sections
 
-### Why This Matters
-Local impact explanation.
+- `What happened`
+- `Why this matters`
+- `Key metrics`
+- `Open questions` (only if present)
+- `Public input` (only if present)
+- `Council discussion` (only if present)
+- `Notable quote` (only if present)
+- `Timeline`
+- `Primary sources` (only if actual links are present)
 
-### Key Metrics
-- Funding
-- Votes
-- Contractors
+### Detail panel behavior
 
-### Timeline
-Chronological actions.
+- desktop: right-side slide-in panel
+- mobile: full-screen bottom sheet
 
-### Open Questions
-Unresolved issues.
+The detail page header includes:
 
-### Council Discussion
-Summary of deliberation.
+- category tag
+- status pill
+- title
+- last action date
+- total discussion time
+- editorial lead (`hook`)
 
-### Public Input
-Community feedback.
+Primary sources appear only when actual source links are available.
 
----
+## Responsive Behavior
 
-## Design Philosophy
+### Mobile
 
-### Meetings → Projects
-Transforms raw meetings into structured knowledge.
+- simplified header: year + single headline
+- no mobile stats row
+- single-column card layout
+- detail panel becomes full-screen
 
-### Compression, not simplification
-Maintains nuance while improving clarity.
+### Mid breakpoint
 
-### Time matters
-Tracks continuity across meetings.
+- cards render in **two columns**
+- cards keep the larger desktop-style proportions instead of shrinking early
 
-### Scan → Dive
-Supports quick browsing and deep reading.
+### Large desktop
 
----
+- cards render in **three columns**
+- wider content width
+- larger chips, hero stats, and detail panel
 
-## Data Model
+## Data Model Used By The Frontend
 
-```json
-{
-  "project_id": "string",
-  "category": "string",
-  "one_sentence_summary": "string",
-  "status_label": "introduced | active | approved | denied | deferred | complete | no_formal_action",
-  "current_status": "string",
-  "last_action_date": "YYYY-MM-DD",
-  "total_time_spent_this_term_seconds": number,
-  "money_adopted_total": number,
-  "vote_count": number,
-  "split_vote_count": number,
-  "top_unresolved_questions": ["string"],
-  "recent_timeline": [
-    {
-      "date": "YYYY-MM-DD",
-      "summary": "string"
-    }
-  ],
-  "public_input_summary": "string | null",
-  "council_discussion_summary": "string | null",
-  "why_this_matters_locally": "string"
-}
+The app reads `data/project_views.jsonl`.
+
+Core fields used directly:
+
+- `project_id`
+- `category`
+- `governing_body`
+- `one_sentence_summary`
+- `status_label`
+- `current_status`
+- `last_action_date`
+- `total_time_spent_this_term_seconds`
+- `money_discussed_total`
+- `money_adopted_total`
+- `money_latest_adopted`
+- `vote_count`
+- `split_vote_count`
+- `public_comment_count`
+- `top_unresolved_questions`
+- `recent_timeline`
+- `notable_quotes`
+- `public_input_summary`
+- `council_discussion_summary`
+- `why_this_matters_locally`
+- `linked_meeting_segments`
+- `tracking_class`
+
+Additional frontend-supported fields used when present:
+
+- `hook`
+- `emoji`
+- future source-link fields such as bill text / meeting video URLs
+
+## Important Frontend-derived Fields
+
+The frontend creates several display fields because the source data does not consistently provide them yet.
+
+These are the main ones:
+
+- short display title
+- hook fallback
+- emoji fallback
+- status class
+- council action
+- vote result
+- source-link normalization
+- time-sensitive classification
+
+Those heuristics live in [app.js](/Users/blairbeverly/projects/localgovtexplorer/app.js) and should eventually be replaced by backend-owned data fields where possible.
+
+## Local Development
+
+Serve the app with a local web server from the repo root:
+
+```bash
+python3 -m http.server 8000
 ```
 
-## Goal
+Then open:
 
-Enable users to answer:
+[http://localhost:8000](http://localhost:8000)
 
-- What is my city working on?
-- What decisions were made?
-- What issues remain unresolved?
+## Tech Notes
 
-Without watching full meetings.
+- no build step
+- plain HTML, CSS, and JavaScript
+- data is loaded client-side from `data/project_views.jsonl`
+- visual design uses:
+  - `Inter` for interface/body copy
+  - `Fraunces` for headline/editorial moments
+
+## Data Pipeline Priorities
+
+The next major improvement is shifting these responsibilities into the data pipeline:
+
+- backend-owned plain-language `display_title`
+- backend-owned `hook`
+- backend-owned `council_action`
+- backend-owned `vote_result`
+- backend-owned `primary_sources`
+- optional backend-owned `attention_level`
+
+With those fields in place, the frontend can become simpler and more predictable.
