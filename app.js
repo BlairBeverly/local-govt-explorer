@@ -643,7 +643,7 @@ function buildCardBadges(project) {
   }
 
   if (project.hasPublicComment) {
-    badges.push(createBadge("public input", "pub"));
+    badges.push(createBadge("public comments", "pub"));
   }
 
   if (project.discussionLabel) {
@@ -890,8 +890,9 @@ function bindEvents() {
 
     const topic = chip.dataset.topicChip;
     if (state.activeTopicFilters.has(topic)) {
-      state.activeTopicFilters.delete(topic);
+      state.activeTopicFilters.clear();
     } else {
+      state.activeTopicFilters.clear();
       state.activeTopicFilters.add(topic);
     }
 

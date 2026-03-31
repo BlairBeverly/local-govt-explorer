@@ -258,38 +258,47 @@ input {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 13px;
-  border: 0.5px solid var(--border);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #5f5b53;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #514d45;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  box-shadow: 0 1px 2px rgba(26, 26, 24, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 .chip:hover,
 .chip:focus-visible {
   outline: none;
-  border-color: rgba(0, 0, 0, 0.16);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 5px rgba(26, 26, 24, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .attribute-chip.on {
   background: var(--text);
   color: var(--warm);
   border-color: var(--text);
+  box-shadow: 0 2px 5px rgba(26, 26, 24, 0.18);
   font-weight: 500;
 }
 
 .attribute-chip:hover,
 .attribute-chip:focus-visible {
-  background: #f1ede6;
+  background: #faf7f1;
   border-color: rgba(0, 0, 0, 0.18);
   color: var(--text);
 }
@@ -302,7 +311,7 @@ input {
 
 .topic-chip {
   color: var(--chip-color);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .topic-chip .chip-dot {
@@ -319,6 +328,7 @@ input {
   background: var(--chip-color);
   color: #ffffff;
   border-color: var(--chip-color);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--chip-color) 28%, rgba(26, 26, 24, 0.12));
   font-weight: 500;
 }
 
@@ -327,8 +337,8 @@ input {
 }
 
 .chip-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
