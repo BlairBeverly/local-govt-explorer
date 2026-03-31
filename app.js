@@ -139,6 +139,22 @@ function formatDate(dateString, style = "short") {
   });
 }
 
+function formatDateRange(dateStrings) {
+  const sortedDates = [...new Set(dateStrings.filter(Boolean))].sort();
+  if (!sortedDates.length) {
+    return "No dates";
+  }
+
+  const first = sortedDates[0];
+  const last = sortedDates[sortedDates.length - 1];
+
+  if (first === last) {
+    return `Since ${formatDate(first)}`;
+  }
+
+  return `Since ${formatDate(first)}`;
+}
+
 function formatCurrency(amount) {
   if (!amount) {
     return "$0";
@@ -488,26 +504,22 @@ function buildProject(rawProject) {
 
 function updateHeroStats() {
   const totalFunding = state.projects.reduce((sum, project) => sum + (project.money_adopted_total || 0), 0);
-  const activeOrUnresolved = state.projects.filter(
-    (project) => project.statusClass === "active" || project.statusClass === "urgent" || project.hasOpenQuestions
-  ).length;
-  const debateCount = state.projects.filter(
-    (project) => project.hasOpenQuestions || project.hasPublicComment || project.longDiscussion || project.split_vote_count > 0
+  const activeCount = state.projects.filter(
+    (project) => project.status_label === "active" || project.status_label === "introduced"
   ).length;
   const totalPublicComments = state.projects.reduce((sum, project) => sum + (project.public_comment_count || 0), 0);
   const totalVotes = state.projects.reduce((sum, project) => sum + (project.vote_count || 0), 0);
-  const meetingDates = new Set(
-    state.projects.flatMap((project) => (project.recent_timeline || []).map((item) => item.date)).filter(Boolean)
+  const coverageDates = state.projects.flatMap((project) =>
+    [(project.last_action_date || ""), ...(project.recent_timeline || []).map((item) => item.date)].filter(Boolean)
   );
 
   heroStatsEl.innerHTML = `
     <div class="stat-card"><span class="stat-num">${state.projects.length}</span><span class="stat-label">projects tracked</span></div>
     <div class="stat-card"><span class="stat-num">${formatCurrency(totalFunding)}</span><span class="stat-label">adopted funding</span></div>
-    <div class="stat-card"><span class="stat-num">${activeOrUnresolved}</span><span class="stat-label">active or unresolved</span></div>
-    <div class="stat-card"><span class="stat-num">${debateCount}</span><span class="stat-label">contested or unresolved</span></div>
+    <div class="stat-card"><span class="stat-num">${activeCount}</span><span class="stat-label">active projects</span></div>
     <div class="stat-card stat-card-optional"><span class="stat-num">${totalPublicComments}</span><span class="stat-label">public comments</span></div>
     <div class="stat-card stat-card-optional"><span class="stat-num">${totalVotes}</span><span class="stat-label">votes recorded</span></div>
-    <div class="stat-card stat-card-optional stat-card-optional-wide"><span class="stat-num">${meetingDates.size}</span><span class="stat-label">meeting dates included</span></div>
+    <div class="stat-card stat-card-optional stat-card-optional-wide"><span class="stat-num">${escapeHtml(formatDateRange(coverageDates))}</span><span class="stat-label">meeting coverage</span></div>
   `;
 
   mobileBannerStatsEl.innerHTML = `
