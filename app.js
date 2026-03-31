@@ -626,10 +626,6 @@ function buildCardBadges(project) {
     badges.push(createBadge(project.voteResult, "vote"));
   }
 
-  if (project.hasOpenQuestions) {
-    badges.push(createBadge("open ?", "q"));
-  }
-
   return badges.slice(0, 3).join("");
 }
 
