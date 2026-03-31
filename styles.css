@@ -354,10 +354,10 @@ input {
 .project-card {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 0;
   width: 100%;
   min-width: 0;
-  padding: 13px 16px 14px;
+  padding: 22px 16px 14px;
   border: 0.5px solid var(--border);
   border-radius: 12px;
   background: var(--card);
@@ -383,6 +383,13 @@ input {
 
 .card-head {
   align-items: center;
+  margin-top: 0;
+}
+
+.card-signal-row-top {
+  margin-top: 0;
+  margin-bottom: 4px;
+  padding-top: 0;
 }
 
 .card-emoji {
@@ -439,6 +446,7 @@ input {
   font-size: 14px;
   font-weight: 500;
   line-height: 1.4;
+  margin-top: -10px;
 }
 
 .card-hook {
@@ -500,13 +508,13 @@ input {
 
 .card-signal-row {
   align-items: center;
-  margin-top: auto;
-  padding-top: 6px;
+  padding-top: 0;
 }
 
 .card-foot {
   align-items: center;
-  padding-top: 1px;
+  margin-top: auto;
+  padding-top: 4px;
 }
 
 .card-foot-left {
@@ -658,7 +666,7 @@ input {
   }
 
   .project-card {
-    padding: 5px 18px 16px;
+    padding: 22px 18px 16px;
     min-height: 238px;
   }
 

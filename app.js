@@ -651,17 +651,17 @@ function renderCards() {
 
       return `
         <button class="project-card" type="button" data-project-id="${project.project_id}">
-          <div class="card-head">
-            <span class="card-emoji">${project.emoji}</span>
-            <div class="card-title">${escapeHtml(project.title)}</div>
-          </div>
-          <div class="card-hook">${escapeHtml(project.hook)}</div>
-          <div class="card-signal-row">
+          <div class="card-signal-row card-signal-row-top">
             <span class="card-badges">${buildCardBadges(project)}</span>
             <span class="card-status-date">
               <span class="status-pill status-${project.statusClass}">${escapeHtml(statusLabel)}</span>
             </span>
           </div>
+          <div class="card-head">
+            <span class="card-emoji">${project.emoji}</span>
+            <div class="card-title">${escapeHtml(project.title)}</div>
+          </div>
+          <div class="card-hook">${escapeHtml(project.hook)}</div>
           <div class="card-foot">
             <span class="card-foot-left card-foot-meta">
               <span class="foot-dot" style="background:${project.categoryMeta.dot}"></span>
